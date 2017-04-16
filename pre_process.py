@@ -1,6 +1,3 @@
-####################
-#Change paths on line 11, 12, 15, 16, 35
-
 import os
 import time
 import scipy.misc
@@ -8,19 +5,19 @@ import numpy as np
 from multiprocessing.dummy import Pool as Parallel
 import cPickle as pickle
 
-user = '/home/siddhu95/'
+user = '/home/avisek/arnav/'
 data = 'DIV2K' #DIV2K
 HR_train_dir = user+'SuperResolution/data/' + data + '_train_HR/'
-LR_train_dir = user+'SuperResolution/data/' + data+ '_train_LR_unknown/X3/'
+LR_train_dir = user+'SuperResolution/data/' + data+ '_train_LR_unknown/X4/'
 #LR_valid_dir = '/users/TeamVideoSummarization/SuperResolution/DIV2K_valid_LR_unknown/X2/'
 
-save_path_lr = user+'SuperResolution/patches/' + data + '_train_LR_unknown/X3/'
-save_path_hr = user+'SuperResolution/patches/' + data + '_train_HR/X3/'
+save_path_lr = user+'SuperResolution/patches/' + data + '_train_LR_unknown/X4/'
+save_path_hr = user+'SuperResolution/patches/' + data + '_train_HR/X4/'
 
 count, g_count = 0, 0
-max_file_size = 500
+max_file_size = 3000
 im_size = 96
-scale = 3#96 / im_size
+scale = 4#96 / im_size
 stride = 32
 
 image_list_hr = np.zeros((max_file_size, im_size*scale, im_size*scale, 3))
@@ -38,7 +35,7 @@ def stack_images(image_id):
 	# _id = image_id.split('/')[-1]
 	# path = os.path.join(path, _id)
 	image_hr = scipy.misc.imread(image_id)
-	image_lr = scipy.misc.imread(image_id.replace(data+'_train_HR/', data+'_train_LR_unknown/X3/').replace('.png', 'x3.png'))
+	image_lr = scipy.misc.imread(image_id.replace(data+'_train_HR/', data+'_train_LR_unknown/X4/').replace('.png', 'x4.png'))
 	print count, image_hr.shape, image_lr.shape
 	h, w = image_hr.shape[:2]
 
@@ -69,7 +66,6 @@ total_hr_train_images = len(hr_train_images)
 total_lr_train_images = len(lr_train_images)
 #total_lr_valid_images = len(lr_valid_images)
 
-_file = user+'dcgan_tf/'
 for image in hr_train_images:
 	stack_images(image)
 

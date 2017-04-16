@@ -1,24 +1,39 @@
 import os
 import h5py
 import time
+import math
 import keras
+import random
 import itertools
 import scipy.misc
 from loss import *
 import numpy as np
-from sklearn.utils import shuffle
 from keras import backend as K
+from sklearn.utils import shuffle
+from imgaug import augmenters as iaa
 from keras.engine.topology import Layer
-from keras.models import Sequential, Model
-from keras.models import model_from_json, load_model
 from keras.utils.data_utils import get_file
+from keras.models import Sequential, Model, load_model
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers import Dense, Dropout, Flatten, merge, Add, Input, Concatenate
 from keras.layers import Conv2D, MaxPooling2D, Permute, Activation, BatchNormalization
-import json
-from imgaug import augmenters as iaa
-import random
+
 keras.backend.set_image_dim_ordering('th')
+num_filters = 64
+im_size = 96
+scale = 2 
+scale2, scale3 = 2, 3 
+max_score = 0.0
+num_filters = 64
+iterations = 1
+
+
+def psnr(img1, img2):
+    mse = np.mean( (img1 - img2) ** 2 )
+    if mse == 0:
+        return 100
+    PIXEL_MAX = 255.0
+    return 20 * math.log10(PIXEL_MAX / math.sqrt(mse))
 
 ''' Theano Backend function '''
 def depth_to_scale_th(input, scale, channels):
@@ -318,7 +333,45 @@ def _inception_residual_block(ip, id, axis_b):
     m = Add()([x, init])
     return m
 
-def sr_model1(img_width = None, img_height = None, axis_b = 1):
+def sr_model_X2_1(img_width = None, img_height = None, axis_b = 1):
+    scale = 2
+    ip = Input(shape=(3, img_width, img_height), name="X_input")   
+    # ip_ = Permute((3, 1, 2))(ip)
+    ip_norm = Normalize(name='input_norm')(ip)
+
+    conv1   = Conv2D(num_filters, (5, 5), padding='same', strides=(1,1), name='sr_conv1')(ip_norm)
+    conv1_b = Activation('relu', name='sr_conv1_activ')(conv1)
+    
+    resblock = _residual_block(conv1_b,  1, axis_b)
+    resblock = _residual_block(resblock, 2, axis_b)
+    resblock = _residual_block(resblock, 3, axis_b)
+    resblock = _residual_block(resblock, 4, axis_b)
+    resblock = _residual_block(resblock, 5, axis_b)
+    resblock = _residual_block(resblock, 6, axis_b)
+    conv2 = Conv2D(num_filters, (3, 3), padding='same', strides=(1,1), name='sr_conv2')(resblock)
+    conv2_b = BatchNormalization(axis=axis_b, name='sr_conv2_batchnorm')(conv2)
+    conv2_b = Activation('relu', name='sr_conv2_activ')(conv2_b)
+
+    merge1 = Add()([conv2_b, conv1_b])
+    
+    conv_up1 = Conv2D(num_filters * scale * scale, (3, 3), padding='same', strides=(1,1), name='sr_upconv1')(merge1)
+    upsamp1 = SubPixelUpscaling(scale, num_filters)(conv_up1)
+    upsamp1 = Activation('relu', name='sr_upconv1_activ')(upsamp1)
+
+    tv_regularizer = TVRegularizer(img_width=im_size * scale, img_height=im_size * scale,
+                                       weight=1e-4)
+
+    conv3 = Conv2D(3, (5, 5), padding='same', strides=(1,1), name='sr_conv3', activation = 'tanh',
+            activity_regularizer=tv_regularizer)(upsamp1)
+
+    out = Denormalize()(conv3)
+    model = Model(ip, out)
+    print model.summary()
+
+    return model
+
+def sr_model_X3_1(img_width = None, img_height = None, axis_b = 1):
+    scale = 3
     ip = Input(shape=(3, img_width, img_height), name="X_input")   
     # ip_ = Permute((3, 1, 2))(ip)
     ip_norm = Normalize(name='input_norm')(ip)
@@ -334,6 +387,8 @@ def sr_model1(img_width = None, img_height = None, axis_b = 1):
     resblock = _residual_block(resblock, 6, axis_b)
     resblock = _residual_block(resblock, 7, axis_b)
     resblock = _residual_block(resblock, 8, axis_b)
+    resblock = _residual_block(resblock, 9, axis_b)
+    resblock = _residual_block(resblock, 10, axis_b)
 
     conv2 = Conv2D(num_filters, (3, 3), padding='same', strides=(1,1), name='sr_conv2')(resblock)
     conv2_b = BatchNormalization(axis=axis_b, name='sr_conv2_batchnorm')(conv2)
@@ -343,12 +398,59 @@ def sr_model1(img_width = None, img_height = None, axis_b = 1):
     
     conv_up1 = Conv2D(num_filters * scale * scale, (3, 3), padding='same', strides=(1,1), name='sr_upconv1')(merge1)
     upsamp1 = SubPixelUpscaling(scale, num_filters)(conv_up1)
-    upsamp1 = Activation('relu', name='sr_upconv2_activ')(upsamp1)
+    upsamp1 = Activation('relu', name='sr_upconv1_activ')(upsamp1)
 
-    tv_regularizer = TVRegularizer(img_width=im_size * scale, img_height=im_size * scale,
+    tv_regularizer = TVRegularizer(img_width=im_size * scale * scale, img_height=im_size * scale * scale,
                                        weight=1e-4)
 
-    conv3 = Conv2D(3, (5, 5), padding='same', strides=(1,1), name='sr_conv3', activation = 'tanh')(upsamp1)
+    conv3 = Conv2D(3, (5, 5), padding='same', strides=(1,1), name='sr_conv3', activation = 'tanh',
+                    activity_regularizer=tv_regularizer)(upsamp1)
+
+    out = Denormalize()(conv3)
+    model = Model(ip, out)
+    print model.summary()
+
+    return model
+
+def sr_model_X4_1(img_width = None, img_height = None, axis_b = 1):
+    scale = 2
+    ip = Input(shape=(3, img_width, img_height), name="X_input")   
+    # ip_ = Permute((3, 1, 2))(ip)
+    ip_norm = Normalize(name='input_norm')(ip)
+
+    conv1   = Conv2D(num_filters, (5, 5), padding='same', strides=(1,1), name='sr_conv1')(ip_norm)
+    conv1_b = Activation('relu', name='sr_conv1_activ')(conv1)
+    
+    resblock = _residual_block(conv1_b,  1, axis_b)
+    resblock = _residual_block(resblock, 2, axis_b)
+    resblock = _residual_block(resblock, 3, axis_b)
+    resblock = _residual_block(resblock, 4, axis_b)
+    resblock = _residual_block(resblock, 5, axis_b)
+    resblock = _residual_block(resblock, 6, axis_b)
+    resblock = _residual_block(resblock, 7, axis_b)
+    resblock = _residual_block(resblock, 8, axis_b)
+    resblock = _residual_block(resblock, 9, axis_b)
+    resblock = _residual_block(resblock, 10, axis_b)
+
+    conv2 = Conv2D(num_filters, (3, 3), padding='same', strides=(1,1), name='sr_conv2')(resblock)
+    conv2_b = BatchNormalization(axis=axis_b, name='sr_conv2_batchnorm')(conv2)
+    conv2_b = Activation('relu', name='sr_conv2_activ')(conv2_b)
+
+    merge1 = Add()([conv2_b, conv1_b])
+    
+    conv_up1 = Conv2D(num_filters * scale * scale, (3, 3), padding='same', strides=(1,1), name='sr_upconv1')(merge1)
+    upsamp1 = SubPixelUpscaling(scale, num_filters)(conv_up1)
+    upsamp1 = Activation('relu', name='sr_upconv1_activ')(upsamp1)
+
+    conv_up2 = Conv2D(num_filters * scale * scale, (3, 3), padding='same', strides=(1,1), name='sr_upconv2')(upsamp1)
+    upsamp2 = SubPixelUpscaling(scale, num_filters)(conv_up2)
+    upsamp2 = Activation('relu', name='sr_upconv2_activ')(upsamp2)
+
+    tv_regularizer = TVRegularizer(img_width=im_size * scale * scale, img_height=im_size * scale * scale,
+                                       weight=1e-4)
+
+    conv3 = Conv2D(3, (5, 5), padding='same', strides=(1,1), name='sr_conv3', activation = 'tanh',
+                    activity_regularizer=tv_regularizer)(upsamp2)
 
     out = Denormalize()(conv3)
     model = Model(ip, out)
@@ -394,6 +496,57 @@ def sr_model2(img_width = None, img_height = None, axis_b = 1):
 
     return model
 
+def sr_model3(img_width = None, img_height = None, axis_b = 1):
+    ip = Input(shape=(3, img_width, img_height), name="X_input")   
+    # ip_ = Permute((3, 1, 2))(ip)
+    ip_norm = Normalize(name='input_norm')(ip)
+
+    conv1   = Conv2D(num_filters, (5, 5), padding='same', strides=(1,1), name='sr_conv1')(ip_norm)
+    conv1_b = Activation('relu', name='sr_conv1_activ')(conv1)
+    
+    resblock = _residual_block(conv1_b,  1, axis_b)
+    resblock = _residual_block(resblock, 2, axis_b)
+    resblock = _residual_block(resblock, 3, axis_b)
+    resblock = _residual_block(resblock, 4, axis_b)
+    resblock = _residual_block(resblock, 5, axis_b)
+    resblock = _residual_block(resblock, 6, axis_b)
+    resblock = _residual_block(resblock, 7, axis_b)
+    resblock = _residual_block(resblock, 8, axis_b)
+
+    conv2 = Conv2D(num_filters, (3, 3), padding='same', strides=(1,1), name='sr_conv2')(resblock)
+    conv2_b = BatchNormalization(axis=axis_b, name='sr_conv2_batchnorm')(conv2)
+    conv2_b = Activation('relu', name='sr_conv2_activ')(conv2_b)
+
+    merge1 = Add()([conv2_b, conv1_b])
+    
+    conv_up_x2 = Conv2D(num_filters * scale2 * scale2, (3, 3), padding='same', strides=(1,1), name='sr_upconv_x2')(merge1)
+    upsamp_x2 = SubPixelUpscaling(scale2, num_filters)(conv_up_x2)
+    upsamp_x2 = Activation('relu', name='sr_upconv2_activ')(upsamp_x2)
+
+    conv_up_x3 = Conv2D(num_filters * scale3 * scale3, (3, 3), padding='same', strides=(1,1), name='sr_upconv_x3')(merge1)
+    upsamp_x3 = SubPixelUpscaling(scale3, num_filters)(conv_up_x3)
+    upsamp_x3 = Activation('relu', name='sr_upconv_x3_activ')(upsamp_x3)
+
+    conv_up_x4 = Conv2D(num_filters * scale2 * scale2, (3, 3), padding='same', strides=(1,1), name='sr_upconv_x4')(upsamp_x2)
+    upsamp_x4 = SubPixelUpscaling(scale2, num_filters)(conv_up_x4)
+    upsamp_x4 = Activation('relu', name='sr_upconv_x4_activ')(upsamp_x4)
+
+    # tv_regularizer = TVRegularizer(img_width=im_size * scale, img_height=im_size * scale,
+    #                                    weight=1e-4)
+
+    conv3_x2 = Conv2D(3, (5, 5), padding='same', strides=(1,1), name='sr_conv_x2', activation = 'tanh')(upsamp_x2)
+    conv3_x3 = Conv2D(3, (5, 5), padding='same', strides=(1,1), name='sr_conv_x3', activation = 'tanh')(upsamp_x3)
+    conv3_x4 = Conv2D(3, (5, 5), padding='same', strides=(1,1), name='sr_conv_x4', activation = 'tanh')(upsamp_x4)
+
+    out_x2 = Denormalize()(conv3_x2)
+    out_x3 = Denormalize()(conv3_x3)
+    out_x4 = Denormalize()(conv3_x4)
+
+    model = Model(ip, outputs=[out_x2, out_x3, out_x4])
+    print model.summary()
+
+    return model
+
 def add_perceptual_loss(model, content_weight, tv_weight):
     # Fix this
     # if tv_weight != 0.0:
@@ -428,18 +581,6 @@ def add_perceptual_loss(model, content_weight, tv_weight):
 
     return model
 
-def make_submission(load_path, save_path):
-    start_time =  time.clock()
-    num_imgs = 0
-    for filename in os.listdir(load_path):
-        num_imgs += 1
-        test_im = [scipy.misc.imread(load_path + filename)]
-        # print test_im[0].shape
-        sample = gen.predict([np.transpose(test_im, (0, 3, 1, 2))])
-        # print np.transpose(sample[0], (1, 2, 0)).shape
-        scipy.misc.imsave(save_path + filename, np.transpose(sample[0], (1, 2, 0)))
-    print ('time_per_image', (time.clock() - start_time) / num_imgs)
-
 def get_augmentation(hr, lr):
     hflipper = iaa.Fliplr(1.0) # always horizontally flip each input image
     vflipper = iaa.Flipud(1.0) # vertically flip each input image with 90% probability
@@ -460,85 +601,121 @@ def get_augmentation(hr, lr):
     lr = np.append(lr, lg, axis=0)
     return hr.astype(np.float32), lr.astype(np.float32)
 
+def make_submission(load_path, save_path):
+    start_time =  time.clock()
+    num_imgs = 0
+    for filename in os.listdir(load_path):
+        num_imgs += 1
+        test_im = [scipy.misc.imread(load_path + filename)]
+        sample = gen.predict([np.transpose(test_im, (0, 3, 1, 2))])
+        scipy.misc.imsave(save_path + filename, np.transpose(sample[0], (1, 2, 0)))
+    print ('time_per_image', (time.clock() - start_time) / num_imgs)
+
+def cross_validate():
+    num_imgs = 0
+    score = 0.0
+    for filename in os.listdir(valid_lr_path):
+        num_imgs += 1
+        lr_inp = np.transpose([scipy.misc.imread(valid_lr_path + filename)], (0, 3, 1, 2))
+        hr_inp = np.transpose([scipy.misc.imread(valid_hr_path + filename.replace('x' + str(scale), ''))], (0, 3, 1, 2))
+
+        score += psnr(hr_inp, gen.predict(lr_inp))
+        
+    return (score / num_imgs)
+
 if __name__=='__main__':
     img_height = None
     img_width = None
     pool_type = 0
+    scale = 2
 
-    user = '/home/siddhu95/'
-    data = 'DIV2K'
-    hr_path = user+'SuperResolution/patches/'+data+'_train_HR/X3/'
-    lr_path = user+'SuperResolution/patches/'+data+'_train_LR_unknown/X3/'
+    hr_path = '../SuperResolution/patches/DIV2K_train_HR/X' + str(scale) + '/'
+    lr_path = '../SuperResolution/patches/DIV2K_train_LR_unknown/X' + str(scale) + '/'
 
-    save_path = user+'SuperResolution/submission/'+data+'_valid_LR_unknown/X3/'
-    load_path = user+'SuperResolution/data/'+data+'_valid_LR_unknown/X3/'
+    save_path = '../SuperResolution/submission/DIV2K_test_LR_unknown/X' + str(scale) + '/'
+    load_path = '../SuperResolution/data/DIV2K_test_LR_unknown/X' + str(scale) + '/'
 
-    model_name = 'model_inception_resnet_aug_x3.h5'
-    load_model = False
+    valid_lr_path = '../SuperResolution/data/DIV2K_valid_LR_unknown/X' + str(scale) + '/'
+    valid_hr_path = '../SuperResolution/data/DIV2K_valid_HR/'
+
+    model_name = 'model_X' + str(scale) + '_1.h5'
+    load_checkpt = False
     train = True
 
     epochs = 50
-    batch_size = 32
+    batch_size = 16
     im_size = 96
-    scale = 3  
-    max_score = 0.0
-    prev_max_loss = 0.0
-    num_filters = 64
 
-    if load_model == True:
-        # gen = model_from_json(json.loads(open('weights/' + model_name.replace('.h5', '.txt')).read()), custom_objects={'Normalize': Normalize, 'SubPixelUpscaling': SubPixelUpscaling})#, 'Denormalize': Denormalize})
-        gen = sr_model1()
-        gen.load_weights('weights/model_resnet_aug_x3.h5')# + model_name)
+    scale2, scale3 = 2, 3 
+    max_score = 0.0
+    num_filters = 64
+    iterations = 1
+    best_cv_score = 0.0
+
+    gen = sr_model_X2_1()
+
+    if load_checkpt == True:
+        gen.load_weights('weights/' + model_name)
         gen.compile(optimizer=keras.optimizers.Adam(lr=1e-4), loss='mse', metrics=[PSNRLoss])
     else:
-        # sr_model1 -> resnet
-        # sr_model2 -> inception-resnet
-        gen = sr_model2()
-        gen.compile(optimizer=keras.optimizers.Adam(lr=1e-3), loss='mse', metrics=[PSNRLoss])
+        gen.compile(optimizer=keras.optimizers.Adam(lr=1e-4), loss='mse', metrics=[PSNRLoss])
 
-    gen.save_weights('weights/' + model_name)  
+    gen.save_weights('weights/' + model_name)
+
+    hr_full = []
+    lr_full = []
     if train == True:
-        c_iter = 0
-        data_iter = 42
         for epoch in xrange(epochs):
             idx = 0
             iscore = 0.0, 0.0 # self.get_inception_score()
-            # for filename in os.listdir(hr_path):
-            for itr in range(data_iter):
-                filename = 'data_' + str(itr) + '.npy'
-                hr_np = np.load(hr_path + filename)
-                lr_np = np.load(lr_path + filename)
-
-                hr_np, lr_np = shuffle(hr_np, lr_np)
+            for filename in os.listdir(hr_path):
+                hr_np = np.transpose(np.load(hr_path + filename), (0, 3, 1, 2))
+                lr_np = np.transpose(np.load(lr_path + filename), (0, 3, 1, 2))
+            
+                # hr_np, lr_np = shuffle(hr_np, lr_np)
                 hr_np, lr_np = get_augmentation(hr_np, lr_np)
 
                 for i in range(0, int(len(hr_np) / batch_size)):
                     lr_batch = lr_np[batch_size * i: batch_size * (i + 1)]
                     hr_batch = hr_np[batch_size * i: batch_size * (i + 1)]
-                    g_loss = gen.train_on_batch(lr_batch.transpose((0, 3, 1, 2)), hr_batch.transpose((0, 3, 1, 2)))
-                    print ("Epoch : ", epoch, " | Loss : ", g_loss) 
-                    c_iter += 1
 
-                    if c_iter==500:
-                        c_iter = 0
-                        scores = 0
-                        for vi in range(data_iter, data_iter+5):
-                            bsd100_hr = np.load(user+'SuperResolution/patches/DIV2K_train_HR/X3/data_'+str(vi)+'.npy').transpose((0, 3, 1, 2))
-                            bsd100_lr = np.load(user+'SuperResolution/patches/DIV2K_train_LR_unknown/X3/data_'+str(vi)+'.npy').transpose((0, 3, 1, 2))
-                            #bsd100_hr, bsd100_lr = shuffle(bsd100_hr, bsd100_lr)
-                            #bsd100_hr, bsd100_lr = bsd100_hr[:1000], bsd100_lr[:1000]
-                            scores += gen.evaluate(bsd100_lr, bsd100_hr, batch_size=64)[1]
+                    # g_loss = gen.train_on_batch(lr_batch.transpose((0, 3, 1, 2)), hr_batch.transpose((0, 3, 1, 2)))
+                    # print ("Epoch : ", epoch, " | Loss : ", g_loss) 
+                    # c_iter += 1
+
+                    # if c_iter==500:
+                    #     c_iter = 0
+                    #     scores = 0
+                    #     for vi in range(data_iter, data_iter+5):
+                    #         bsd100_hr = np.load(user+'SuperResolution/patches/DIV2K_train_HR/X3/data_'+str(vi)+'.npy').transpose((0, 3, 1, 2))
+                    #         bsd100_lr = np.load(user+'SuperResolution/patches/DIV2K_train_LR_unknown/X3/data_'+str(vi)+'.npy').transpose((0, 3, 1, 2))
+                    #         #bsd100_hr, bsd100_lr = shuffle(bsd100_hr, bsd100_lr)
+                    #         #bsd100_hr, bsd100_lr = bsd100_hr[:1000], bsd100_lr[:1000]
+                    #         scores += gen.evaluate(bsd100_lr, bsd100_hr, batch_size=64)[1]
                         
-                        scores = scores/5
-                        print "Validating Data PSNR: ", scores
+                    #     scores = scores/5
+                    #     print "Validating Data PSNR: ", scores
 
-                        if scores > max_score:
-                            gen.save_weights('weights/' + model_name)
-                            with open('weights/' + model_name.replace('.h5', '.txt'), 'w') as fp:
-                                json.dump(gen.to_json(), fp)
-                            # make_submission(load_path, save_path)
-                            max_score = scores
+                    #     if scores > max_score:
+                    #         gen.save_weights('weights/' + model_name)
+                    #         with open('weights/' + model_name.replace('.h5', '.txt'), 'w') as fp:
+                    #             json.dump(gen.to_json(), fp)
+                    #         # make_submission(load_path, save_path)
+                    #         max_score = scores
 
-                        if g_loss[1] > prev_max_loss:
-                            gen.save_weights('weights/' + model_name[:-3] + '_best_on_train.h5')
-                            prev_max_loss = g_loss[1]
+                    #     if g_loss[1] > prev_max_loss:
+                    #         gen.save_weights('weights/' + model_name[:-3] + '_best_on_train.h5')
+                    #         prev_max_loss = g_loss[1]
+
+                    g_loss = gen.train_on_batch(lr_batch, hr_batch)
+                    print ("Epoch : ", epoch, " | Loss : ", g_loss) 
+                    
+                    iterations += 1
+
+                    # cross validate the model and save the weights
+                    if iterations % 500 == 0:  
+                        cv_score = cross_validate()
+                        print 'Cross Validation Score:', cv_score
+                        if cv_score > (best_cv_score - 0.5):         
+                            gen.save_weights('weights/' + model_name)    
+                            make_submission(load_path, save_path)

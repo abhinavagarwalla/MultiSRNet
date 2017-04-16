@@ -787,11 +787,12 @@ def make_submission(gen, load_path, save_path):
     print ('time_per_image', (time.clock() - start_time) / num_imgs)
 
 if __name__ == "__main__":
-    hr_path = '/users/siddhu95/SuperResolution/patches/train_HR/X2/'
-    lr_path = '/users/siddhu95/SuperResolution/patches/train_LR_bicubic/X2/'
 
-    save_path = '/users/siddhu95/SuperResolution/submission/valid_LR_bicubic/X2/'
-    load_path = '/users/siddhu95/SuperResolution/data/DIV2K_valid_LR_bicubic/X2/'
+    hr_path = '/users/TeamVideoSummarization/SuperResolution/patches/train_HR/X2/'
+    lr_path = '/users/TeamVideoSummarization/SuperResolution/patches/train_LR_bicubic/X2/'
+
+    save_path = '/users/TeamVideoSummarization/SuperResolution/submission/valid_LR_bicubic/X2/'
+    load_path = '/users/TeamVideoSummarization/SuperResolution/data/DIV2K_valid_LR_bicubic/X2/'
 
 
     # from keras.utils.visualize_util import plot

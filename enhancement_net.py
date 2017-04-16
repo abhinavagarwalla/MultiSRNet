@@ -7,7 +7,6 @@ import itertools
 import scipy.misc
 from loss import *
 import numpy as np
-# from keras_model import sr_model1
 from keras import backend as K
 from sklearn.utils import shuffle
 from imgaug import augmenters as iaa
@@ -329,7 +328,6 @@ if __name__=='__main__':
     max_score = 0.0
     num_filters = 64
     iterations = 1
-
     # sr_model1 -> resnet
     # sr_model2 -> inception-resnet
     gen = sr_model1()
