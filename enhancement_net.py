@@ -302,8 +302,8 @@ if __name__=='__main__':
     load_path = '../SuperResolution/data/DIV2K_valid_LR_unknown/X3/'
 
     gen_model_name = 'model_resnet_aug_x3.h5'
-    model_name = 'en_model_resnet_aug_x3.h5'
-    load_checkpt = False
+    model_name = 'en_x3.h5'
+    load_checkpt = True
     train = True
 
     epochs = 50
@@ -353,14 +353,3 @@ if __name__=='__main__':
                             max_g_loss = g_loss[1]
                             en_net.save_weights('weights/' + model_name[:-3] + '_best_on_train.h5')    
                             # make_submission(load_path, save_path)
-
-            # if (epoch + 1) % 5 == 4:
-            #     bsd100_lr = np.load('')
-            #     bsd100_hr = np.load('')
-            #     scores = gen.evaluate(bsd100_lr, bsd100_hr, batch_size=16)
-            #     print scores
-
-            #     if scores[1] > max_score:
-            #         gen.save('weights/' + model_name)
-            #         make_submission(load_path, save_path)
-            #         max_score = scores[1]
