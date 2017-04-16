@@ -434,7 +434,7 @@ def cross_validate_en():
         hr_inp = np.transpose([scipy.misc.imread(valid_hr_path + filename.replace('x' + str(scale), ''))], (0, 3, 1, 2))
 
         score += psnr(hr_inp, en_net.predict(gen.predict(lr_inp)))   
-        print score/num_imgs     
+        # print score/num_imgs     
     return (score / num_imgs)
 
 def enhancement_model(img_height=None, img_width=None):
@@ -473,7 +473,7 @@ if __name__=='__main__':
 
     user = '/home/abhinav/'
     data = 'DIV2K'
-    scale = 2
+    scale = 3
 
     hr_path = '../SuperResolution/patches/DIV2K_train_HR/X' + str(scale) + '/'
     lr_path = '../SuperResolution/patches/DIV2K_train_LR_unknown/X' + str(scale) + '/'
@@ -484,7 +484,7 @@ if __name__=='__main__':
     valid_lr_path = '../SuperResolution/data/DIV2K_valid_LR_unknown/X' + str(scale) + '/'
     valid_hr_path = '../SuperResolution/data/DIV2K_valid_HR/'
 
-    model_name = 'model_resnet_aug.h5'
+    model_name = 'model_resnet_aug_x3.h5'
 
     epochs = 50
     batch_size = 32
@@ -493,13 +493,13 @@ if __name__=='__main__':
     num_filters = 64
 
     gen = sr_model1()
-    gen.load_weights('weights/from_top/' + model_name)
+    gen.load_weights('weights/' + model_name)
     gen.compile(optimizer=keras.optimizers.Adam(lr=1e-4), loss='mse', metrics=[PSNRLoss])
 
-    en_net = enhancement_model()
-    en_net.load_weights('weights/en_model2.h5')
+    # en_net = enhancement_model()
+    # en_net.load_weights('weights/en_x3.h5')
 
-    print cross_validate_en()
+    # print cross_validate_en()
     # scores = 0
     # for vi in range(1):
     #     bsd100_hr = np.load(user+'SuperResolution/patches/BSD_train_HR/X2/data_'+str(vi)+'.npy').transpose((0, 3, 1, 2))
@@ -508,4 +508,4 @@ if __name__=='__main__':
     # scores = np.mean(scores)
     # print "Validating Data PSNR: ", scores
 
-    # make_submission(load_path, save_path)
+    make_submission(load_path, save_path)
