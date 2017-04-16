@@ -366,7 +366,7 @@ def sr_model_X2_1(img_width = None, img_height = None, axis_b = 1):
 
     out = Denormalize()(conv3)
     model = Model(ip, out)
-    print model.summary()
+    # print model.summary()
 
     return model
 
@@ -387,8 +387,6 @@ def sr_model_X3_1(img_width = None, img_height = None, axis_b = 1):
     resblock = _residual_block(resblock, 6, axis_b)
     resblock = _residual_block(resblock, 7, axis_b)
     resblock = _residual_block(resblock, 8, axis_b)
-    resblock = _residual_block(resblock, 9, axis_b)
-    resblock = _residual_block(resblock, 10, axis_b)
 
     conv2 = Conv2D(num_filters, (3, 3), padding='same', strides=(1,1), name='sr_conv2')(resblock)
     conv2_b = BatchNormalization(axis=axis_b, name='sr_conv2_batchnorm')(conv2)
@@ -408,7 +406,7 @@ def sr_model_X3_1(img_width = None, img_height = None, axis_b = 1):
 
     out = Denormalize()(conv3)
     model = Model(ip, out)
-    print model.summary()
+    # print model.summary()
 
     return model
 
@@ -454,7 +452,7 @@ def sr_model_X4_1(img_width = None, img_height = None, axis_b = 1):
 
     out = Denormalize()(conv3)
     model = Model(ip, out)
-    print model.summary()
+    # print model.summary()
 
     return model
 
