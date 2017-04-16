@@ -290,16 +290,33 @@ def make_submission(load_path, save_path):
         scipy.misc.imsave(save_path + filename, np.transpose(sample[0], (1, 2, 0)))
     print ('time_per_image', (time.clock() - start_time) / num_imgs)
 
+def cross_validate():
+    num_imgs = 0
+    score = 0.0
+    for filename in os.listdir(valid_lr_path):
+        num_imgs += 1
+        lr_inp = np.transpose([scipy.misc.imread(valid_lr_path + filename)], (0, 3, 1, 2))
+        hr_inp = np.transpose([scipy.misc.imread(valid_hr_path + filename.replace('x' + str(scale), ''))], (0, 3, 1, 2))
+
+        score += psnr(hr_inp, en_net.predict(gen.predict(lr_inp)))
+    return (score/num_imgs)
+
 if __name__=='__main__':
     img_height = None
     img_width = None
     pool_type = 0
 
-    hr_path = '../SuperResolution/patches/train_HR/X3/'
-    lr_path = '../SuperResolution/patches/train_LR_unknown/X3/'
+    scale = 3 
 
-    save_path = '../SuperResolution/submission/valid_LR_unknown/X3/'
-    load_path = '../SuperResolution/data/DIV2K_valid_LR_unknown/X3/'
+
+    hr_path = '../SuperResolution/patches/DIV2K_train_HR/X' + str(scale) + '/'
+    lr_path = '../SuperResolution/patches/DIV2K_train_LR_unknown/X' + str(scale) + '/'
+
+    save_path = '../SuperResolution/submission/DIV2K_test_LR_unknown/X' + str(scale) + '/'
+    load_path = '../SuperResolution/data/DIV2K_test_LR_unknown/X' + str(scale) + '/'
+
+    valid_lr_path = '../SuperResolution/data/DIV2K_valid_LR_unknown/X' + str(scale) + '/'
+    valid_hr_path = '../SuperResolution/data/DIV2K_valid_HR/'
 
     gen_model_name = 'model_resnet_aug_x3.h5'
     model_name = 'en_x3.h5'
@@ -309,10 +326,10 @@ if __name__=='__main__':
     epochs = 50
     batch_size = 16
     im_size = 96
-    scale = 3 
     max_score = 0.0
     num_filters = 64
     iterations = 1
+
     # sr_model1 -> resnet
     # sr_model2 -> inception-resnet
     gen = sr_model1()
@@ -327,6 +344,7 @@ if __name__=='__main__':
 
     if train == True:
         max_g_loss = 0.
+        best_cv_score = 0.
         for epoch in xrange(epochs):
             idx = 0
             iscore = 0.0, 0.0 # self.get_inception_score()
@@ -353,3 +371,9 @@ if __name__=='__main__':
                             max_g_loss = g_loss[1]
                             en_net.save_weights('weights/' + model_name[:-3] + '_best_on_train.h5')    
                             # make_submission(load_path, save_path)
+
+                        cv_score = cross_validate()
+                        print 'Cross Validation Score:', cv_score
+                        if cv_score > (best_cv_score):         
+                            best_cv_score = cv_score
+                            en_net.save_weights('weights/' + model_name)
