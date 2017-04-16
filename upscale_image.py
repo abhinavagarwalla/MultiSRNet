@@ -404,13 +404,13 @@ def sr_model3(img_width = None, img_height = None, axis_b = 1):
 
     return model
 
-def make_submission(load_path, save_path):
+def upscale_dir(load_path, save_path):
     start_time =  time.clock()
     num_imgs = 0
     for filename in os.listdir(load_path):
         num_imgs += 1
         test_im = [scipy.misc.imread(load_path + filename)]
-        sample = gen.predict([np.transpose(test_im, (0, 3, 1, 2))])
+        sample = en_net.predict(gen.predict([np.transpose(test_im, (0, 3, 1, 2))]))
         scipy.misc.imsave(save_path + filename, np.transpose(sample[0], (1, 2, 0)))
     print ('time_per_image', (time.clock() - start_time) / num_imgs)
 
@@ -451,6 +451,7 @@ def enhancement_model(img_height=None, img_width=None):
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Specify scale and image path')
     parser.add_argument('--image_path', default=None, help='Specify the image path')
+    parser.add_argument('--image_dir', default=None, help='Specify an input directory')
     parser.add_argument('--scale', type=int, default=2, help='Specify upscaling factor')
     parser.add_argument('--save_path', default='./', help='Specify output directory')
     args = parser.parse_args()
@@ -461,6 +462,7 @@ if __name__=='__main__':
 
     scale = args.scale
     im_path = args.image_path
+    im_dir = args.image_dir
     save_path = args.save_path
 
     model_name = 'model_resnet_x' + str(scale) + '.h5'
@@ -475,4 +477,8 @@ if __name__=='__main__':
 
     en_net = enhancement_model()
     en_net.load_weights('weights/' + en_model_name)
-    upscale_image(im_path, save_path)
+
+    if im_path:
+        upscale_image(im_path, save_path)
+    if im_dir:
+        upscale_dir(im_dir, save_path)
