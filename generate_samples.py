@@ -437,6 +437,29 @@ def cross_validate_en():
         # print score/num_imgs     
     return (score / num_imgs)
 
+def save_validate():
+    num_imgs = 0
+    score = 0.0
+    for filename in os.listdir(valid_lr_path):
+        num_imgs += 1
+        lr_inp = np.transpose([scipy.misc.imread(valid_lr_path + filename)], (0, 3, 1, 2))
+        hr_inp = np.transpose([scipy.misc.imread(valid_hr_path + filename.replace('x' + str(scale), ''))], (0, 3, 1, 2))
+        sample = gen.predict(lr_inp)
+        scipy.misc.imsave(valid_en_path+ filename, np.transpose(sample[0], (1, 2, 0)))
+        score += psnr(hr_inp, sample)        
+    return (score / num_imgs)
+
+def save_validate_en():
+    num_imgs = 0
+    score = 0.0
+    for filename in os.listdir(valid_en_path):
+        num_imgs += 1
+        lr_inp = np.transpose([scipy.misc.imread(valid_en_path + filename)], (0, 3, 1, 2))
+        hr_inp = np.transpose([scipy.misc.imread(valid_hr_path + filename.replace('x' + str(scale), ''))], (0, 3, 1, 2))
+        sample = en_net.predict(lr_inp)
+        score += psnr(hr_inp, sample)
+    return (score / num_imgs)
+
 def enhancement_model(img_height=None, img_width=None):
     ip = Input(shape=(3, img_width, img_height), name="X_input")   
     ip_norm = Normalize(name='input_norm')(ip)
@@ -483,8 +506,8 @@ if __name__=='__main__':
 
     valid_lr_path = '../SuperResolution/data/DIV2K_valid_LR_unknown/X' + str(scale) + '/'
     valid_hr_path = '../SuperResolution/data/DIV2K_valid_HR/'
-
-    model_name = 'model_resnet_aug_x3.h5'
+    valid_en_path = '../SuperResolution/data/DIV2K_mid/X' + str(scale) + '/'
+    model_name = 'model_resnet_x3.h5'
 
     epochs = 50
     batch_size = 32
@@ -492,13 +515,14 @@ if __name__=='__main__':
     max_score = 0.0
     num_filters = 64
 
-    gen = sr_model1()
-    gen.load_weights('weights/' + model_name)
-    gen.compile(optimizer=keras.optimizers.Adam(lr=1e-4), loss='mse', metrics=[PSNRLoss])
+    # gen = sr_model1()
+    # gen.load_weights('weights/' + model_name)
+    # gen.compile(optimizer=keras.optimizers.Adam(lr=1e-4), loss='mse', metrics=[PSNRLoss])
 
-    # en_net = enhancement_model()
-    # en_net.load_weights('weights/en_x3.h5')
+    en_net = enhancement_model()
+    en_net.load_weights('weights/en_x3.h5')
 
+    print save_validate_en()
     # print cross_validate_en()
     # scores = 0
     # for vi in range(1):
@@ -508,4 +532,4 @@ if __name__=='__main__':
     # scores = np.mean(scores)
     # print "Validating Data PSNR: ", scores
 
-    make_submission(load_path, save_path)
+    # make_submission(load_path, save_path)
